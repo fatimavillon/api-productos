@@ -1,0 +1,2 @@
+roles:
+  LabRole: arn:aws:iam::339713127941:role/LabRole

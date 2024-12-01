@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Lista de carpetas donde se encuentran los servicios
+services=(
+  "api inventarios"
+  "api pedidos"
+  "api productos"
+  "api usuarios"
+  "api-facturacion"
+  "api-reportes"
+)
+
+# Recorre cada carpeta y ejecuta "sls deploy"
+for service in "${services[@]}"; do
+  echo "Deploying service in folder: $service"
+  cd "$service" || { echo "Failed to enter folder $service"; exit 1; }
+
+  # Ejecuta el despliegue
+  sls deploy
+  if [ $? -ne 0 ]; then
+    echo "Deployment failed in $service"
+    exit 1
+  fi
+
+  # Vuelve al directorio raíz
+  cd - || exit
+done
+
+echo "All services deployed successfully!"

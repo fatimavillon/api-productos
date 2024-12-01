@@ -1,0 +1,97 @@
+service: productService
+
+provider:
+  name: aws
+  runtime: python3.10
+  region: us-east-1
+  role: ${file(../roleARN.yaml):roles.LabRole}
+  environment:
+    TABLE_NAME: ${self:service}-${opt:stage, 'dev'}
+
+functions:
+  getProducts:
+    handler: product_lambda.get_products
+    events:
+      - http:
+          path: /products
+          method: get
+          queryStringParameters:
+            - tenant_id
+          cors: true
+
+  createProduct:
+    handler: product_lambda.create_product
+    events:
+      - http:
+          path: /products
+          method: post
+          cors: true
+
+  manageProduct:
+    handler: product_lambda.lambda_handler
+    events:
+      - http:
+          path: /products
+          method: get
+          queryStringParameters:
+            - product_id
+            - tenant_id
+          cors: true
+      - http:
+          path: /products
+          method: put
+          cors: true
+      - http:
+          path: /products
+          method: delete
+          cors: true
+
+resources:
+  Resources:
+    ProductsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_NAME}
+        AttributeDefinitions:
+          - AttributeName: tenant_id
+            AttributeType: S  # ID de tenant (String)
+          - AttributeName: product_id
+            AttributeType: S  # ID del producto (String)
+          - AttributeName: name
+            AttributeType: S  # Nombre del producto (String)
+          - AttributeName: price
+            AttributeType: N  # Precio del producto (Número)
+          - AttributeName: created_at
+            AttributeType: S  # Fecha de creación (String)
+        KeySchema:
+          - AttributeName: tenant_id
+            KeyType: HASH  # La clave HASH es el tenant_id para asegurar multi-tenancy
+          - AttributeName: product_id
+            KeyType: RANGE  # La clave RANGE es el product_id, único dentro de cada tenant
+        BillingMode: PAY_PER_REQUEST  # Facturación bajo demanda, adecuado para cargas impredecibles
+        GlobalSecondaryIndexes:
+          - IndexName: name-index  # Índice secundario para buscar productos por nombre
+            KeySchema:
+              - AttributeName: name
+                KeyType: HASH  # Busca por nombre
+              - AttributeName: tenant_id
+                KeyType: RANGE  # Asegura que la búsqueda se limite al tenant específico
+            Projection:
+              ProjectionType: ALL  # Incluye todos los atributos
+          - IndexName: price-index  # Índice secundario para buscar productos por precio
+            KeySchema:
+              - AttributeName: price
+                KeyType: HASH  # Busca por precio
+              - AttributeName: tenant_id
+                KeyType: RANGE  # Limita la búsqueda al tenant específico
+            Projection:
+              ProjectionType: ALL
+        LocalSecondaryIndexes:
+          - IndexName: created_at-index  # Índice local para buscar productos por fecha de creación
+            KeySchema:
+              - AttributeName: tenant_id
+                KeyType: HASH  # Busca por tenant_id
+              - AttributeName: created_at
+                KeyType: RANGE  # Limita la búsqueda por fecha de creación dentro del tenant
+            Projection:
+              ProjectionType: ALL
